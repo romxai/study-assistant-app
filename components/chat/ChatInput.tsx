@@ -6,10 +6,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "./FileUpload";
 import { PaperclipIcon, SendIcon } from "lucide-react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-import { processFile } from "@/lib/gemini";
+//import { processFile } from "@/lib/gemini";
+//import { processFile } from "@/lib/gemini";
+
+interface MessageAttachment {
+  type: "document" | "image";
+  url: string;
+  name: string;
+}
 
 interface ChatInputProps {
-  onSend: (content: string, attachments?: File[]) => Promise<void>;
+  onSend: (content: string, attachments?: MessageAttachment[]) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -32,22 +39,37 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
     try {
       setIsProcessing(true);
 
-      // If there are attachments, process them first
+      const processedAttachments: MessageAttachment[] = [];
+      //let aiAnalysis = "";
+
+      // Process attachments if any
       if (attachments.length > 0) {
         for (const file of attachments) {
           // Upload to Cloudinary
           const cloudinaryUrl = await uploadToCloudinary(file);
 
-          // Process file with Gemini
-          const analysis = await processFile(file, message || undefined);
+          // Add to processed attachments
+          processedAttachments.push({
+            url: cloudinaryUrl,
+            type: file.type.startsWith("image/") ? "image" : "document",
+            name: file.name,
+          });
 
-          // Send the analysis
-          await onSend(analysis);
+          // Get AI analysis
+          //aiAnalysis = await processFile(file, message || undefined);
         }
-      } else {
-        // Just send the text message
-        await onSend(message);
       }
+
+      // Send user message with attachments
+      await onSend(
+        message || "Attached file for analysis",
+        processedAttachments
+      );
+
+      // If there was a file analysis, send it as AI response
+      //if (aiAnalysis) {
+      //  await onSend(aiAnalysis, []);
+      //}
 
       setMessage("");
       setAttachments([]);
@@ -71,63 +93,65 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {showFileUpload && (
-        <FileUpload
-          onUpload={handleFileUpload}
-          accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-        />
-      )}
-      <div className="flex items-end gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowFileUpload(!showFileUpload)}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          <PaperclipIcon className="h-5 w-5" />
-        </Button>
-        <Textarea
-          ref={textareaRef}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message slothGPT..."
-          className="min-h-[40px] flex-1 rounded-3xl border-slate-300"
-        />
-        <Button
-          type="submit"
-          disabled={isLoading || isProcessing}
-          className="bg-indigo-600 text-white rounded-full px-4 py-2 hover:bg-indigo-700"
-        >
-          <SendIcon className="h-5 w-5" />
-        </Button>
-      </div>
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {attachments.map((file, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs"
-            >
-              <span>{file.name}</span>
-              <button
-                type="button"
-                onClick={() =>
-                  setAttachments((prev) => prev.filter((_, i) => i !== index))
-                }
-                className="text-destructive hover:text-destructive/90"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+    <div className="border-t border-gray-200 bg-white px-4 py-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {showFileUpload && (
+          <FileUpload
+            onUpload={handleFileUpload}
+            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+          />
+        )}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowFileUpload(!showFileUpload)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <PaperclipIcon className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 relative">
+            <Textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="What's in your mind?"
+              className="min-h-[44px] max-h-[200px] py-3 px-4 rounded-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+              rows={1}
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={isLoading || isProcessing}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 h-10 w-10 flex items-center justify-center"
+          >
+            <SendIcon className="h-5 w-5" />
+          </Button>
         </div>
-      )}
-      <div className="self-stretch text-center text-slate-400 text-sm font-medium font-['Plus Jakarta Sans'] leading-tight">
-        slothGPT can make mistakes. Check our Terms &amp; Conditions.
-      </div>
-    </form>
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1 text-sm text-gray-700"
+              >
+                <span className="truncate max-w-[150px]">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAttachments((prev) => prev.filter((_, i) => i !== index))
+                  }
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </form>
+    </div>
   );
 }

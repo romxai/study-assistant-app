@@ -3,6 +3,7 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
+import { ChatMessage } from "@/types/chat";
 
 if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
   throw new Error("Missing Gemini API key");
@@ -36,40 +37,72 @@ const generationConfig = {
   maxOutputTokens: 2048,
 };
 
-interface Message {
-  role: "user" | "model";
-  parts: string;
-}
-
 export async function generateResponse(
   prompt: string,
-  history: Message[] = []
+  history: ChatMessage[] = [],
+  attachment?: { url: string; type: "document" | "image"; name: string }
 ) {
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: attachment ? "gemini-1.5-pro" : "gemini-1.5-flash",
       generationConfig,
       safetySettings,
     });
 
-    const chat = model.startChat({
-      history: history.map((msg) => ({
-        role: msg.role,
-        parts: [{ text: msg.parts }],
-      })),
-      generationConfig,
-      safetySettings,
-    });
+    if (attachment) {
+      // Fetch the file from Cloudinary URL
+      const fileResponse = await fetch(attachment.url);
+      const fileBuffer = await fileResponse.arrayBuffer();
 
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response;
-    const text = response.text();
+      // Create file part
+      const filePart = {
+        inlineData: {
+          data: Buffer.from(fileBuffer).toString("base64"),
+          mimeType:
+            attachment.type === "image" ? "image/jpeg" : "application/pdf",
+        },
+      };
 
-    if (!text) {
-      throw new Error("Empty response from Gemini API");
+      // Create text part
+      const textPart = {
+        text:
+          prompt ||
+          (attachment.type === "image"
+            ? "Analyze this image and describe what you see in detail."
+            : "Please analyze this document and provide a detailed summary."),
+      };
+
+      // Generate content with file and text
+      const result = await model.generateContent([filePart, textPart]);
+      const response = await result.response;
+      const text = response.text();
+
+      if (!text) {
+        throw new Error("Empty response from Gemini API");
+      }
+
+      return text;
+    } else {
+      // Regular text chat
+      const chat = model.startChat({
+        history: history.map((msg) => ({
+          role: msg.role === "assistant" ? "model" : "user",
+          parts: [{ text: msg.content }],
+        })),
+        generationConfig,
+        safetySettings,
+      });
+
+      const result = await chat.sendMessage(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      if (!text) {
+        throw new Error("Empty response from Gemini API");
+      }
+
+      return text;
     }
-
-    return text;
   } catch (error: any) {
     console.error("Error generating response:", error);
     throw error;
@@ -102,11 +135,11 @@ export async function processFile(file: File, prompt?: string) {
     };
 
     const defaultPrompt = `Please analyze this ${file.type} file and provide a detailed summary with the following structure:
-1. Main Topic/Purpose
-2. Key Points (as bullet points)
-3. Summary (2-3 paragraphs)
-4. Important Details or Findings
-5. Recommendations (if applicable)`;
+    1. Main Topic/Purpose
+    2. Key Points (as bullet points)
+    3. Summary (2-3 paragraphs)
+    4. Important Details or Findings
+    5. Recommendations (if applicable)`;
 
     const result = await model.generateContent([
       fileData,
