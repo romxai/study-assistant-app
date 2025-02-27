@@ -5,6 +5,7 @@ export interface ChatMessage {
   content: string;
   role: MessageRole;
   timestamp: number;
+  email: string;
   attachments?: {
     type: "document" | "image";
     url: string;

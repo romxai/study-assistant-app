@@ -6,8 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "./FileUpload";
 import { PaperclipIcon, SendIcon } from "lucide-react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-//import { processFile } from "@/lib/gemini";
-//import { processFile } from "@/lib/gemini";
 
 interface MessageAttachment {
   type: "document" | "image";
@@ -38,39 +36,22 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
 
     try {
       setIsProcessing(true);
-
       const processedAttachments: MessageAttachment[] = [];
-      //let aiAnalysis = "";
 
-      // Process attachments if any
-      if (attachments.length > 0) {
-        for (const file of attachments) {
-          // Upload to Cloudinary
-          const cloudinaryUrl = await uploadToCloudinary(file);
+      for (const file of attachments) {
+        const cloudinaryUrl = await uploadToCloudinary(file);
 
-          // Add to processed attachments
-          processedAttachments.push({
-            url: cloudinaryUrl,
-            type: file.type.startsWith("image/") ? "image" : "document",
-            name: file.name,
-          });
-
-          // Get AI analysis
-          //aiAnalysis = await processFile(file, message || undefined);
-        }
+        processedAttachments.push({
+          url: cloudinaryUrl,
+          type: file.type.startsWith("image/") ? "image" : "document",
+          name: file.name,
+        });
       }
 
-      // Send user message with attachments
       await onSend(
         message || "Attached file for analysis",
         processedAttachments
       );
-
-      // If there was a file analysis, send it as AI response
-      //if (aiAnalysis) {
-      //  await onSend(aiAnalysis, []);
-      //}
-
       setMessage("");
       setAttachments([]);
       setShowFileUpload(false);
@@ -130,27 +111,6 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
             <SendIcon className="h-5 w-5" />
           </Button>
         </div>
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {attachments.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1 text-sm text-gray-700"
-              >
-                <span className="truncate max-w-[150px]">{file.name}</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAttachments((prev) => prev.filter((_, i) => i !== index))
-                  }
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </form>
     </div>
   );

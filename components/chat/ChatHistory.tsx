@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,34 +10,152 @@ import {
   Settings,
   LogOut,
   User,
+  Edit2,
+  Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+
+interface Conversation {
+  _id: string;
+  title: string;
+  updatedAt: string;
+}
 
 interface ChatHistoryProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  user: any; // Replace 'any' with your user type
+  user: any;
   onLogout: () => Promise<void>;
+  onSelectConversation: (conversationId: string) => void;
+  selectedConversationId?: string;
+  isTemporaryChat: boolean;
 }
-
-// Placeholder data for chat history
-const placeholderChats = [
-  { id: "1", title: "Physics Chat" },
-  { id: "2", title: "Math Problems" },
-  { id: "3", title: "General Q&A" },
-  { id: "4", title: "History Notes" },
-  { id: "5", title: "Coding Help" },
-];
 
 export function ChatHistory({
   isCollapsed,
   onToggleCollapse,
   user,
   onLogout,
+  onSelectConversation,
+  selectedConversationId,
+  isTemporaryChat,
 }: ChatHistoryProps) {
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      const response = await fetch("/api/conversations");
+      const data = await response.json();
+      if (data.conversations) {
+        setConversations(
+          data.conversations.sort(
+            (a: Conversation, b: Conversation) =>
+              new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to fetch conversations:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingId]);
+
+  const handleNewChat = () => {
+    onSelectConversation("");
+  };
+
+  const handleDeleteChat = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setConversations((prev) =>
+          prev.filter((conv) => conv._id !== conversationId)
+        );
+        if (selectedConversationId === conversationId) {
+          onSelectConversation("");
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete chat:", error);
+    }
+  };
+
+  const startEditing = (conversation: Conversation) => {
+    setEditingId(conversation._id);
+    setEditTitle(conversation.title);
+  };
+
+  const handleRename = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title: editTitle }),
+      });
+
+      if (response.ok) {
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv._id === conversationId
+              ? {
+                  ...conv,
+                  title: editTitle,
+                  updatedAt: new Date().toISOString(),
+                }
+              : conv
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to rename chat:", error);
+    } finally {
+      setEditingId(null);
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditTitle("");
+  };
+
+  // Add a new conversation to the list
+  const addConversation = (conversation: Conversation) => {
+    setConversations((prev) => [conversation, ...prev]);
+  };
+
+  // Update a conversation in the list
+  const updateConversation = (
+    conversationId: string,
+    updates: Partial<Conversation>
+  ) => {
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv._id === conversationId
+          ? { ...conv, ...updates, updatedAt: new Date().toISOString() }
+          : conv
+      )
+    );
+  };
 
   return (
     <aside
@@ -69,6 +187,7 @@ export function ChatHistory({
             <Button
               variant="default"
               className="w-full justify-start gap-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
+              onClick={handleNewChat}
             >
               <PlusCircle className="h-4 w-4" />
               New chat
@@ -78,30 +197,86 @@ export function ChatHistory({
                 Your conversations
               </h3>
               <ul className="mt-2 space-y-2">
-                {placeholderChats.map((chat) => (
-                  <li
-                    key={chat.id}
-                    className={`flex items-center justify-between rounded-lg p-2 hover:bg-gray-200 cursor-pointer ${
-                      selectedChat === chat.id ? "bg-gray-200" : ""
-                    }`}
-                    onClick={() => setSelectedChat(chat.id)}
-                  >
+                {isTemporaryChat && selectedConversationId === "" && (
+                  <li className="flex items-center justify-between rounded-lg p-2 bg-gray-200">
                     <div className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      <span className="truncate">{chat.title}</span>
+                      <span className="truncate">New Chat</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Handle delete chat (implementation later)
-                        console.log("Delete chat:", chat.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  </li>
+                )}
+                {conversations.map((chat) => (
+                  <li
+                    key={chat._id}
+                    className={`flex items-center justify-between rounded-lg p-2 hover:bg-gray-200 cursor-pointer group ${
+                      selectedConversationId === chat._id ? "bg-gray-200" : ""
+                    }`}
+                    onClick={() => !editingId && onSelectConversation(chat._id)}
+                  >
+                    <div className="flex items-center gap-2 flex-1">
+                      <MessageSquare className="h-4 w-4 shrink-0" />
+                      {editingId === chat._id ? (
+                        <div className="flex items-center gap-1 flex-1">
+                          <Input
+                            ref={editInputRef}
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="h-6 text-sm"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleRename(chat._id);
+                              } else if (e.key === "Escape") {
+                                cancelEditing();
+                              }
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleRename(chat._id)}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={cancelEditing}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="truncate">{chat.title}</span>
+                      )}
+                    </div>
+                    {!editingId && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-gray-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditing(chat);
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteChat(chat._id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

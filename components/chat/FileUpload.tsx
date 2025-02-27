@@ -11,7 +11,7 @@ interface FileUploadProps {
 
 export function FileUpload({
   onUpload,
-  accept = ".pdf,.doc,.docx,.txt",
+  accept = ".pdf,.txt",
 }: FileUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);

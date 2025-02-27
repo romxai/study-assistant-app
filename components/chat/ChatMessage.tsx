@@ -1,6 +1,10 @@
 import { ChatMessage as ChatMessageType } from "@/types/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { FileIcon } from "lucide-react";
+import { FileIcon, GraduationCap } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -18,46 +22,88 @@ export function ChatMessage({ message }: ChatMessageProps) {
         {message.role === "user" ? (
           <>
             <AvatarImage src="" />
-            <AvatarFallback className="bg-gray-200">
-              <img src="/user-avatar.png" alt="User" className="rounded-full" />
-            </AvatarFallback>
+            <AvatarFallback
+              className="flex items-center justify-center h-full w-full text-lg font-bold text-white"
+              style={{
+                background: "linear-gradient(135deg, #4F46E5,rgb(240, 87, 237))",
+              }}
+            ></AvatarFallback>
           </>
         ) : (
           <>
             <AvatarImage src="" />
-            <AvatarFallback className="bg-indigo-50">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 48 48"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect width="48" height="48" rx="24" fill="#EEF2FF" />
-                <path
-                  d="M27.0625 19.625H20.9375C20.5894 19.625 20.2556 19.7633 20.0094 20.0094C19.7633 20.2556 19.625 20.5894 19.625 20.9375V27.0625C19.625 27.4106 19.7633 27.7444 20.0094 27.9906C20.2556 28.2367 20.5894 28.375 20.9375 28.375H27.0625C27.4106 28.375 27.7444 28.2367 27.9906 27.9906C28.2367 27.7444 28.375 27.4106 28.375 27.0625V20.9375C28.375 20.5894 28.2367 20.2556 27.9906 20.0094C27.7444 19.7633 27.4106 19.625 27.0625 19.625Z"
-                  fill="#4F46E5"
-                />
-              </svg>
+            <AvatarFallback
+              className="flex items-center justify-center h-full w-full text-lg font-bold text-white"
+              style={{
+                background: "linear-gradient(135deg, #FF6B6B,rgb(101, 157, 236))",
+              }}
+            >
+              <GraduationCap className="h-7 w-7" />
             </AvatarFallback>
           </>
         )}
       </Avatar>
+
       <div className="flex-1 flex flex-col gap-1">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-800 text-base font-bold font-['Plus Jakarta Sans'] leading-snug">
-              {message.role === "user" ? "You" : "CHAT A.I.+"}
-            </span>
-          </div>
-          <span className="text-slate-400 text-sm font-medium font-['Plus Jakarta Sans'] leading-tight">
+          <span className="text-slate-800 text-base font-bold">
+            {message.role === "user" ? "You" : "CHAT A.I.+"}
+          </span>
+          <span className="text-slate-400 text-sm font-medium">
             {formattedTime}
           </span>
         </div>
+
         <div className="p-3 bg-slate-50 rounded-3xl">
-          <p className="text-slate-600 text-base font-normal font-['Plus Jakarta Sans'] leading-relaxed whitespace-pre-wrap">
-            {message.content}
-          </p>
+          <div className="prose prose-sm md:prose-lg prose-slate max-w-none">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw, rehypeSanitize]}
+              components={{
+                h1: ({ node, ...props }) => (
+                  <h1 className="text-2xl font-bold mt-4 mb-2" {...props} />
+                ),
+                h2: ({ node, ...props }) => (
+                  <h2 className="text-xl font-semibold mt-3 mb-2" {...props} />
+                ),
+                h3: ({ node, ...props }) => (
+                  <h3 className="text-lg font-semibold mt-2 mb-1" {...props} />
+                ),
+                ul: ({ node, ...props }) => (
+                  <ul className="list-disc ml-6 mt-2" {...props} />
+                ),
+                ol: ({ node, ...props }) => (
+                  <ol className="list-decimal ml-6 mt-2" {...props} />
+                ),
+                li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                a: ({ node, ...props }) => (
+                  <a className="text-blue-600 hover:underline" {...props} />
+                ),
+                blockquote: ({ node, ...props }) => (
+                  <blockquote
+                    className="border-l-4 border-blue-500 pl-4 italic text-gray-600"
+                    {...props}
+                  />
+                ),
+                code: ({ node, inline, className, children, ...props }) =>
+                  inline ? (
+                    <code
+                      className="bg-gray-100 rounded px-1 py-0.5 text-red-600"
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  ) : (
+                    <pre className="bg-gray-900 text-white rounded-lg p-3 overflow-x-auto">
+                      <code {...props}>{children}</code>
+                    </pre>
+                  ),
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
+
           {message.attachments?.map((attachment, index) => (
             <div key={index} className="mt-3">
               {attachment.type === "image" ? (

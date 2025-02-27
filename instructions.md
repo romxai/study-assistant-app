@@ -30,12 +30,12 @@ The Study Assistant App is designed to help users efficiently process, organize,
 2. **Chat Interface & Document Upload**
 
    - Build a minimalistic chat UI using React (TypeScript) styled with Tailwind CSS and ShadCN UI.//
-   - Allow file uploads directly in the chat (using Cloudinary for storage).--
+   - Allow file uploads directly in the chat (using Cloudinary for storage).//
    - Integrate React Context API for state management and Axios for API calls.//
 
 3. **Basic AI Integration**
    - Connect the chat interface with the Gemini API for real-time responses.//
-   - Process text-based queries and small document uploads synchronously.--
+   - Process text-based queries and small document uploads synchronously.//
 
 ### Phase 2: Advanced Content Processing
 

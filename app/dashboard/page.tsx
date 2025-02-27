@@ -1,37 +1,63 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { Chat } from "@/components/chat/Chat";
-import { Sidebar } from "@/components/Sidebar";
-
-interface Message {
-  role: "user" | "model";
-  parts: string;
-}
+import { ChatHistory } from "@/components/chat/ChatHistory";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([]);
-
-  const handleNewChat = () => {
-    setMessages([]); // Clear messages for a new chat
-  };
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [selectedConversationId, setSelectedConversationId] =
+    useState<string>("");
+  const [isTemporaryChat, setIsTemporaryChat] = useState(true);
 
   if (!user) {
     router.push("/login");
     return null;
   }
 
+  const handleNewChat = () => {
+    setSelectedConversationId("");
+    setIsTemporaryChat(true);
+  };
+
+  const handleSelectConversation = (conversationId: string) => {
+    setSelectedConversationId(conversationId);
+    setIsTemporaryChat(conversationId === "");
+  };
+
+  const handleConversationCreated = useCallback((conversationId: string) => {
+    setSelectedConversationId(conversationId);
+    setIsTemporaryChat(false);
+  }, []);
+
   return (
     <div className="flex h-screen bg-white">
-      <Sidebar onNewChat={handleNewChat} />
+      <ChatHistory
+        isCollapsed={isCollapsed}
+        onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        user={user}
+        onLogout={async () => {
+          try {
+            await logout();
+            router.push("/login");
+          } catch (error) {
+            console.error("Logout failed:", error);
+          }
+        }}
+        onSelectConversation={handleSelectConversation}
+        selectedConversationId={selectedConversationId}
+        isTemporaryChat={isTemporaryChat}
+      />
       <main className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
-          <Chat messages={messages} setMessages={setMessages} />
-        </div>
+        <Chat
+          conversationId={selectedConversationId || undefined}
+          onNewChat={handleNewChat}
+          onConversationCreated={handleConversationCreated}
+        />
       </main>
     </div>
   );
