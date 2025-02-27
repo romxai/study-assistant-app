@@ -29,57 +29,133 @@ const safetySettings = [
   },
 ];
 
-export async function generateResponse(prompt: string, context?: string) {
+const generationConfig = {
+  temperature: 0.9,
+  topK: 1,
+  topP: 1,
+  maxOutputTokens: 2048,
+};
+
+interface Message {
+  role: "user" | "model";
+  parts: string;
+}
+
+export async function generateResponse(
+  prompt: string,
+  history: Message[] = []
+) {
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
+      generationConfig,
       safetySettings,
     });
 
-    const fullPrompt = context
-      ? `Context: ${context}\n\nQuestion: ${prompt}`
-      : prompt;
+    const chat = model.startChat({
+      history: history.map((msg) => ({
+        role: msg.role,
+        parts: [{ text: msg.parts }],
+      })),
+      generationConfig,
+      safetySettings,
+    });
 
-    const result = await model.generateContent(fullPrompt);
+    const result = await chat.sendMessage(prompt);
     const response = await result.response;
+    const text = response.text();
 
-    if (!response.text()) {
+    if (!text) {
       throw new Error("Empty response from Gemini API");
     }
 
-    return response.text();
+    return text;
   } catch (error: any) {
     console.error("Error generating response:", error);
-    throw new Error(error.message || "Failed to generate response");
+    throw error;
+  }
+}
+
+export async function processFile(file: File, prompt?: string) {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig,
+      safetySettings,
+    });
+
+    // Convert file to base64
+    const base64Data = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Create file data object
+    const fileData = {
+      inlineData: {
+        data: base64Data.split(",")[1],
+        mimeType: file.type,
+      },
+    };
+
+    const defaultPrompt = `Please analyze this ${file.type} file and provide a detailed summary with the following structure:
+1. Main Topic/Purpose
+2. Key Points (as bullet points)
+3. Summary (2-3 paragraphs)
+4. Important Details or Findings
+5. Recommendations (if applicable)`;
+
+    const result = await model.generateContent([
+      fileData,
+      prompt || defaultPrompt,
+    ]);
+    const response = await result.response;
+    const text = response.text();
+
+    if (!text) {
+      throw new Error("Empty response from Gemini API");
+    }
+
+    return text;
+  } catch (error: any) {
+    console.error("Error processing file:", error);
+    throw error;
   }
 }
 
 export async function analyzeDocument(content: string) {
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-pro",
+      model: "gemini-1.5-flash",
+      generationConfig,
       safetySettings,
     });
 
-    const prompt = `Please analyze this document and provide a comprehensive summary with key points:
+    const prompt = `Please analyze this document and provide a comprehensive analysis with the following structure:
 
-${content}
-
-Please format the response with:
 1. Main Topic
 2. Key Points (bullet points)
-3. Summary (2-3 paragraphs)`;
+3. Summary (2-3 paragraphs)
+4. Important Details
+5. Recommendations or Next Steps
+
+Content to analyze:
+${content}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
+    const text = response.text();
 
-    if (!response.text()) {
+    if (!text) {
       throw new Error("Empty response from Gemini API");
     }
 
-    return response.text();
+    return text;
   } catch (error: any) {
     console.error("Error analyzing document:", error);
-    throw new Error(error.message || "Failed to analyze document");
+    throw error;
   }
 }
